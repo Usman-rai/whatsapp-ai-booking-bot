@@ -1,0 +1,1268 @@
+{
+  "name": "WhatsApp Dental Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "com.twilio.messaging.inbound-message.received"
+        ]
+      },
+      "id": "35bfe5ea-13b7-45fe-a078-4c4f64f81523",
+      "name": "Twilio Trigger",
+      "type": "n8n-nodes-base.twilioTrigger",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        16
+      ],
+      "webhookId": "105e28ea-b6d4-43b6-b8d2-45550c7ad095",
+      "credentials": {
+        "twilioApi": {
+          "id": "O7mxIEnAD7rki8qT",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "userMessage",
+              "value": "={{ $json.chatInput || $json.data?.body || $json.Body }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "userPhone",
+              "value": "={{ ($json.data?.from || $json.From || \"chat-test-user\").replace(\"whatsapp:\", \"\") }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "sessionId",
+              "value": "={{ $json.sessionId || $json.data?.from || $json.From || \"chat-test\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "todayDate",
+              "value": "={{ $now.toFormat(\"yyyy-MM-dd\") }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d245bb24-238c-4d31-b711-f01b85d8e109",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -608,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appvOoNEtpJuEEDru",
+          "mode": "list",
+          "cachedResultName": "Dental Clinic AI Assistant",
+          "cachedResultUrl": "https://airtable.com/appvOoNEtpJuEEDru"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblnhEuBmsoYAxajm",
+          "mode": "list",
+          "cachedResultName": "Patients",
+          "cachedResultUrl": "https://airtable.com/appvOoNEtpJuEEDru/tblnhEuBmsoYAxajm"
+        },
+        "filterByFormula": "={{ \"{Phone Number} = \\\"\" + $json.userPhone + \"\\\"\" }}",
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "id": "1235bbb2-f8ca-4c46-8c9e-d79e398ff67c",
+      "name": "Lookup Patient",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        -368,
+        16
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AGKFw0YbYIJHj0Sd",
+          "name": "Airtable Personal Access Token account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Phone: {{ $('Set Variables').item.json.userPhone }}\nToday: {{ $('Set Variables').item.json.todayDate }}\nPatient: {{ $('Lookup Patient').isEmpty() ? \"NEW\" : JSON.stringify($('Lookup Patient').first().json.fields) }}\n\nMessage: {{ $('Set Variables').item.json.userMessage }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "You are Sarah, AI receptionist at BrightSmile Dental Melbourne.\n\nCLINIC: 41 Taylors Road, St Albans VIC 3021. Hours Mon-Thu 9am-5pm, Fri 9am-4pm. Closed weekends. Phone 03 9366 9779. Melbourne timezone +10:00.\n\nSERVICES (price/duration):\n- Cleaning $180 (45min)\n- Filling $220+ (30min)  \n- Whitening $450 (60min)\n- Denture consult FREE (30min)\n- Dentures from $1,500\n- Emergency $250 (45min, same-day)\n\nINSURANCE: HBF, Bupa, Medibank, NIB, HCF. HICAPS available.\n\nTOOLS:\n1. check_availability — returns BOOKED slots. Empty [] = day FREE.\n2. book_appointment_calendar — create event AFTER patient confirms.\n3. save_appointment_to_database — save to Airtable AFTER booking.\n\nRULES:\n- BE DECISIVE. Vague time? Default to 10am Mon-Fri.\n- MAX 2 sentences per reply.\n- Empty calendar = pick any time in clinic hours.\n- Never weekends. Never make up info. Never re-ask same question.\n- Flow: check → confirm with patient → book + save → done.\n- Emergency: offer same-day, mention 03 9366 9779.\n- Unknown? Say \"Let me check with our team.\"\n\nEXAMPLE:\nUser: \"Cleaning Monday any time, name John\"\nYou: [check_availability] \"Monday 10am works, John — confirm? 👍\"\nUser: \"Yes\"  \nYou: [book_appointment_calendar] [save_appointment_to_database] \"Booked! ✅ Cleaning Mon 10am. See you then!\"\n\nBe warm, fast, decisive. Book in 3 messages.",
+          "maxIterations": 3
+        }
+      },
+      "id": "5b6cd858-afe9-43ab-8333-3ca1ef783500",
+      "name": "AI Receptionist",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -16,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Set Variables').item.json.sessionId }}",
+        "contextWindowLength": 8
+      },
+      "id": "96ec7753-394c-4dce-8be8-4fea963aa83a",
+      "name": "Conversation Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -48,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "raiusmanr517@gmail.com"
+        },
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start_time', 'Start of time window in ISO 8601 Melbourne TZ') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('end_time', 'End of time window in ISO 8601 Melbourne TZ') }}",
+        "options": {
+          "outputFormat": "bookedSlots"
+        }
+      },
+      "id": "30467499-8de7-4720-ace2-289620a778cf",
+      "name": "check_availability",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        80,
+        304
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "hmWCysoh0k6y41sl",
+          "name": "Google Calendar OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "raiusmanr517@gmail.com"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('start_time', 'Start time ISO 8601 Melbourne TZ') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('end_time', 'End time ISO 8601. +45min cleaning, +30 filling, +60 whitening') }}",
+        "additionalFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('description', 'Service, phone, notes') }}",
+          "location": "41 Taylors Road, St Albans VIC 3021, Melbourne",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('summary', 'Event title: Service - PatientName - Phone') }}"
+        }
+      },
+      "id": "90cc7e2a-482e-4025-a0b2-d4d78c814460",
+      "name": "book_appointment_calendar",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        304
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "hmWCysoh0k6y41sl",
+          "name": "Google Calendar OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('Set Variables').item.json.userPhone }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "rightValue": "chat-test-user"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6d8085ca-92e1-40d8-a714-a123f510249d",
+      "name": "Is WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        432,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appvOoNEtpJuEEDru",
+          "mode": "list",
+          "cachedResultName": "Dental Clinic AI Assistant",
+          "cachedResultUrl": "https://airtable.com/appvOoNEtpJuEEDru"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl5NqymLjNfUoFb9",
+          "mode": "list",
+          "cachedResultName": "Conversations",
+          "cachedResultUrl": "https://airtable.com/appvOoNEtpJuEEDru/tbl5NqymLjNfUoFb9"
+        },
+        "columns": {
+          "0": "{",
+          "1": "{",
+          "2": " ",
+          "3": "{",
+          "4": " ",
+          "5": "\"",
+          "6": "m",
+          "7": "a",
+          "8": "p",
+          "9": "p",
+          "10": "i",
+          "11": "n",
+          "12": "g",
+          "13": "M",
+          "14": "o",
+          "15": "d",
+          "16": "e",
+          "17": "\"",
+          "18": ":",
+          "19": " ",
+          "20": "\"",
+          "21": "d",
+          "22": "e",
+          "23": "f",
+          "24": "i",
+          "25": "n",
+          "26": "e",
+          "27": "B",
+          "28": "e",
+          "29": "l",
+          "30": "o",
+          "31": "w",
+          "32": "\"",
+          "33": ",",
+          "34": " ",
+          "35": "\"",
+          "36": "v",
+          "37": "a",
+          "38": "l",
+          "39": "u",
+          "40": "e",
+          "41": "\"",
+          "42": ":",
+          "43": " ",
+          "44": "{",
+          "45": " ",
+          "46": "\"",
+          "47": "P",
+          "48": "a",
+          "49": "t",
+          "50": "i",
+          "51": "e",
+          "52": "n",
+          "53": "t",
+          "54": " ",
+          "55": "P",
+          "56": "h",
+          "57": "o",
+          "58": "n",
+          "59": "e",
+          "60": "\"",
+          "61": ":",
+          "62": " ",
+          "63": "$",
+          "64": "(",
+          "65": "'",
+          "66": "S",
+          "67": "e",
+          "68": "t",
+          "69": " ",
+          "70": "V",
+          "71": "a",
+          "72": "r",
+          "73": "i",
+          "74": "a",
+          "75": "b",
+          "76": "l",
+          "77": "e",
+          "78": "s",
+          "79": "'",
+          "80": ")",
+          "81": ".",
+          "82": "i",
+          "83": "t",
+          "84": "e",
+          "85": "m",
+          "86": ".",
+          "87": "j",
+          "88": "s",
+          "89": "o",
+          "90": "n",
+          "91": ".",
+          "92": "u",
+          "93": "s",
+          "94": "e",
+          "95": "r",
+          "96": "P",
+          "97": "h",
+          "98": "o",
+          "99": "n",
+          "100": "e",
+          "101": ",",
+          "102": " ",
+          "103": "\"",
+          "104": "M",
+          "105": "e",
+          "106": "s",
+          "107": "s",
+          "108": "a",
+          "109": "g",
+          "110": "e",
+          "111": " ",
+          "112": "T",
+          "113": "e",
+          "114": "x",
+          "115": "t",
+          "116": "\"",
+          "117": ":",
+          "118": " ",
+          "119": "$",
+          "120": "(",
+          "121": "'",
+          "122": "S",
+          "123": "e",
+          "124": "t",
+          "125": " ",
+          "126": "V",
+          "127": "a",
+          "128": "r",
+          "129": "i",
+          "130": "a",
+          "131": "b",
+          "132": "l",
+          "133": "e",
+          "134": "s",
+          "135": "'",
+          "136": ")",
+          "137": ".",
+          "138": "i",
+          "139": "t",
+          "140": "e",
+          "141": "m",
+          "142": ".",
+          "143": "j",
+          "144": "s",
+          "145": "o",
+          "146": "n",
+          "147": ".",
+          "148": "u",
+          "149": "s",
+          "150": "e",
+          "151": "r",
+          "152": "M",
+          "153": "e",
+          "154": "s",
+          "155": "s",
+          "156": "a",
+          "157": "g",
+          "158": "e",
+          "159": ",",
+          "160": " ",
+          "161": "\"",
+          "162": "A",
+          "163": "I",
+          "164": " ",
+          "165": "R",
+          "166": "e",
+          "167": "s",
+          "168": "p",
+          "169": "o",
+          "170": "n",
+          "171": "s",
+          "172": "e",
+          "173": "\"",
+          "174": ":",
+          "175": " ",
+          "176": "$",
+          "177": "(",
+          "178": "'",
+          "179": "A",
+          "180": "I",
+          "181": " ",
+          "182": "R",
+          "183": "e",
+          "184": "c",
+          "185": "e",
+          "186": "p",
+          "187": "t",
+          "188": "i",
+          "189": "o",
+          "190": "n",
+          "191": "i",
+          "192": "s",
+          "193": "t",
+          "194": "'",
+          "195": ")",
+          "196": ".",
+          "197": "i",
+          "198": "t",
+          "199": "e",
+          "200": "m",
+          "201": ".",
+          "202": "j",
+          "203": "s",
+          "204": "o",
+          "205": "n",
+          "206": ".",
+          "207": "o",
+          "208": "u",
+          "209": "t",
+          "210": "p",
+          "211": "u",
+          "212": "t",
+          "213": ",",
+          "214": " ",
+          "215": "\"",
+          "216": "T",
+          "217": "i",
+          "218": "m",
+          "219": "e",
+          "220": "s",
+          "221": "t",
+          "222": "a",
+          "223": "m",
+          "224": "p",
+          "225": "\"",
+          "226": ":",
+          "227": " ",
+          "228": "$",
+          "229": "n",
+          "230": "o",
+          "231": "w",
+          "232": ".",
+          "233": "t",
+          "234": "o",
+          "235": "I",
+          "236": "S",
+          "237": "O",
+          "238": "(",
+          "239": ")",
+          "240": ",",
+          "241": " ",
+          "242": "\"",
+          "243": "D",
+          "244": "i",
+          "245": "r",
+          "246": "e",
+          "247": "c",
+          "248": "t",
+          "249": "i",
+          "250": "o",
+          "251": "n",
+          "252": "\"",
+          "253": ":",
+          "254": " ",
+          "255": "\"",
+          "256": "I",
+          "257": "n",
+          "258": "b",
+          "259": "o",
+          "260": "u",
+          "261": "n",
+          "262": "d",
+          "263": "\"",
+          "264": " ",
+          "265": "}",
+          "266": " ",
+          "267": "}",
+          "268": " ",
+          "269": "}",
+          "270": "}",
+          "mappingMode": "defineBelow",
+          "value": {
+            "Escalated to Human": false,
+            "Patient Phone": "={{ $('Set Variables').item.json.userPhone }}",
+            "Message Text": "={{ $('Set Variables').item.json.userMessage }}",
+            "AI Response": "={{ $('AI Receptionist').item.json.output }}",
+            "Direction": "=Inbound",
+            "Timestamp": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Patient Phone",
+              "displayName": "Patient Phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Message ID",
+              "displayName": "Message ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Direction",
+              "displayName": "Direction",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Inbound",
+                  "value": "Inbound"
+                },
+                {
+                  "name": "Outbound",
+                  "value": "Outbound"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Message Text",
+              "displayName": "Message Text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "AI Response",
+              "displayName": "AI Response",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Intent Detected",
+              "displayName": "Intent Detected",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Greeting",
+                  "value": "Greeting"
+                },
+                {
+                  "name": "Booking Request",
+                  "value": "Booking Request"
+                },
+                {
+                  "name": "Question",
+                  "value": "Question"
+                },
+                {
+                  "name": "Pricing",
+                  "value": "Pricing"
+                },
+                {
+                  "name": "Hours",
+                  "value": "Hours"
+                },
+                {
+                  "name": "Emergency",
+                  "value": "Emergency"
+                },
+                {
+                  "name": "Complaint",
+                  "value": "Complaint"
+                },
+                {
+                  "name": "Other",
+                  "value": "Other"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Escalated to Human",
+              "displayName": "Escalated to Human",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Message Length",
+              "displayName": "Message Length",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Is Inbound?",
+              "displayName": "Is Inbound?",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Time of Day",
+              "displayName": "Time of Day",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Day of Week",
+              "displayName": "Day of Week",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Sentiment Score",
+              "displayName": "Sentiment Score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Conversation Summary",
+              "displayName": "Conversation Summary",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "id": "fbd1443e-f7de-428b-9b60-c0af950aff39",
+      "name": "Log Conversation",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        784,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "vue5Ad0zO2R9O0q6",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "from": "+14155238886",
+        "to": "=+923294462757",
+        "toWhatsapp": true,
+        "message": "={{ $('AI Receptionist').item.json.output }}",
+        "options": {}
+      },
+      "id": "557d88f7-ff77-4b76-988c-2cc2177b5f31",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        0
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "O7mxIEnAD7rki8qT",
+          "name": "Twilio account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        304
+      ],
+      "id": "7b8fc907-2c63-4755-801b-6a306275ad73",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "hk02f0eMjM2IICFl",
+          "name": "Groq account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        304
+      ],
+      "id": "040b6e05-48e1-437b-8d38-4bd59f52d565",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "YP8JXTt2TGwr2r6J",
+          "name": "OpenRouter account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appvOoNEtpJuEEDru",
+          "mode": "list",
+          "cachedResultName": "Dental Clinic AI Assistant",
+          "cachedResultUrl": "https://airtable.com/appvOoNEtpJuEEDru"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblW1uK0QupwNfAh1",
+          "mode": "list",
+          "cachedResultName": "Appointments",
+          "cachedResultUrl": "https://airtable.com/appvOoNEtpJuEEDru/tblW1uK0QupwNfAh1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Service Requested": "={{ $fromAI('service', 'Must be one of: Cleaning, Filling, Whitening, Dentures, Checkup, Emergency, Consultation') }}",
+            "Requested Date": "={{ $fromAI('date', 'Appointment date in YYYY-MM-DD format like 2026-05-26') }}",
+            "Requested Time": "={{ $fromAI('time', 'Time like 10:00 AM or 14:30') }}",
+            "Status": "=Confirmed",
+            "Booking Source": "=WhatsApp Bot",
+            "Notes": "={{ $fromAI('notes', 'Patient name, phone number, and any special requests') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Requested Time",
+              "displayName": "Requested Time",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Patient",
+              "displayName": "Patient",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Service Requested",
+              "displayName": "Service Requested",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Cleaning",
+                  "value": "Cleaning"
+                },
+                {
+                  "name": "Filling",
+                  "value": "Filling"
+                },
+                {
+                  "name": "Whitening",
+                  "value": "Whitening"
+                },
+                {
+                  "name": "Dentures",
+                  "value": "Dentures"
+                },
+                {
+                  "name": "Checkup",
+                  "value": "Checkup"
+                },
+                {
+                  "name": "Emergency",
+                  "value": "Emergency"
+                },
+                {
+                  "name": "Consultation",
+                  "value": "Consultation"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Requested Date",
+              "displayName": "Requested Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Appointment ID",
+              "displayName": "Appointment ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Pending",
+                  "value": "Pending"
+                },
+                {
+                  "name": "Confirmed",
+                  "value": "Confirmed"
+                },
+                {
+                  "name": "Completed",
+                  "value": "Completed"
+                },
+                {
+                  "name": "Cancelled",
+                  "value": "Cancelled"
+                },
+                {
+                  "name": "No Show",
+                  "value": "No Show"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Booking Source",
+              "displayName": "Booking Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "WhatsApp Bot",
+                  "value": "WhatsApp Bot"
+                },
+                {
+                  "name": "Phone",
+                  "value": "Phone"
+                },
+                {
+                  "name": "Website",
+                  "value": "Website"
+                },
+                {
+                  "name": "Walk-in",
+                  "value": "Walk-in"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Created At",
+              "displayName": "Created At",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Google Calendar Event ID",
+              "displayName": "Google Calendar Event ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Patient Name",
+              "displayName": "Patient Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Patient Status",
+              "displayName": "Patient Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Days Until Appointment",
+              "displayName": "Days Until Appointment",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Is Today?",
+              "displayName": "Is Today?",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Appointment Summary (AI)",
+              "displayName": "Appointment Summary (AI)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Next Action Recommendation (AI)",
+              "displayName": "Next Action Recommendation (AI)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "type": "n8n-nodes-base.airtableTool",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        304
+      ],
+      "id": "4caf84d8-eb3f-4b1f-ad27-7165c07c3f7a",
+      "name": "save_appointment_to_database",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AGKFw0YbYIJHj0Sd",
+          "name": "Airtable Personal Access Token account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Twilio Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "Lookup Patient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Patient": {
+      "main": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Receptionist": {
+      "main": [
+        [
+          {
+            "node": "Is WhatsApp?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_availability": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "book_appointment_calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is WhatsApp?": {
+      "main": [
+        [
+          {
+            "node": "Log Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Conversation": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save_appointment_to_database": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "yqja96v5IJkeBPum",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "a885e0c8-1314-4e5e-ade5-45e2f3f90a8b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "461fb617fc2e3dac00eceeb8492af1a469a3ef5e73f310d71853e991a2c465f7"
+  },
+  "id": "tj3XIeT6Tvv4Lx6V",
+  "tags": []
+}
